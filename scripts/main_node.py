@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import rospy
+import os
 from sensor_msgs.msg import Image          # 导入图像消息类型
 from std_msgs.msg import Int32MultiArray   # 导入数组消息类型
 from geometry_msgs.msg import Twist
@@ -14,6 +15,7 @@ class PatrolSystem:
         
         # 1. 初始化各子模块
         self.vision = VisionProcessor()
+        self.evidence_saved = False # 标记是否已经存证
         # self.nav = NavigationManager() 
         
         # 2. 订阅话题（连接传感器）
@@ -33,25 +35,30 @@ class PatrolSystem:
             rate.sleep()
 
     def decision_making(self):
-        """核心决策逻辑：以后加功能主要改这里"""
+        # === 注意：这里所有的代码都必须缩进 4 个空格 ===
         
         # 场景 A: 发现入侵者
         if self.vision.person_detected:
             if self.state != "ALARM":
                 rospy.logwarn("【状态切换】PATROL -> ALARM")
                 self.state = "ALARM"
-                self.vision.save_evidence() # 拍照
+                self.evidence_saved = False # 重置存证标志
+            
+            # === 新增逻辑：如果还没存证，就尝试存证 ===
+            if not self.evidence_saved:
+                # 只有当图片不为空时，才算存证成功
+                if self.vision.latest_image is not None:
+                    self.vision.save_evidence()
+                    self.evidence_saved = True # 标记已完成，防止重复存
+            # ========================================
             
             self.stop_robot()
-            # self.audio.play_warning() # 以后可以在这加语音
             
         # 场景 B: 环境安全
         else:
             if self.state == "ALARM":
                 rospy.loginfo("【状态切换】ALARM -> PATROL")
                 self.state = "PATROL"
-            
-            # self.nav.continue_patrol() # 继续巡逻
 
     def stop_robot(self):
         msg = Twist()
