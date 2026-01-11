@@ -59,7 +59,7 @@ class YoloDetector:
         self.prev_frame_time = 0
         self.sub = rospy.Subscriber("/repaired_image", Image, self.image_callback)
         self.box_pub = rospy.Publisher('/yolo_box', Int32MultiArray, queue_size=1)
-        self.debug_pub = rospy.Publisher('/patrol/debug_image', Image, queue_size=1)
+        self.debug_pub = rospy.Publisher('/patrol/debug_yolo', Image, queue_size=1)
         rospy.loginfo("YOLOv5n 启动成功！准备检测...")
 
     def get_color(self, id):

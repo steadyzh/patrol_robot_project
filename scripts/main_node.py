@@ -17,7 +17,7 @@ class PatrolSystem:
         # 订阅 YOLO 的结果
         rospy.Subscriber("/yolo_box", Int32MultiArray, self.vision.box_callback)
         # 订阅 YOLO 画好的图 (注意这里修正了话题名)
-        rospy.Subscriber("/patrol/debug_image", Image, self.vision.image_callback)
+        rospy.Subscriber("/patrol/debug_yolo", Image, self.vision.image_callback)
         
         self.cmd_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
         self.state = "PATROL" 
