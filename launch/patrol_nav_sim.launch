@@ -1,0 +1,22 @@
+<launch>
+  <!-- 1. 加载地图 -->
+  <arg name="map_file" default="$(find patrol_system)/config/map.yaml"/>
+  <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" />
+
+  <!-- 2. 启动全能仿真节点 (替代原来的静态TF) -->
+  <node pkg="patrol_system" type="fake_robot.py" name="fake_robot_simulator" output="screen" />
+  
+  <!-- 3. Move Base -->
+  <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
+    <rosparam file="$(find nav)/config/costmap_common_params_lite.yaml" command="load" ns="global_costmap" />
+    <rosparam file="$(find nav)/config/costmap_common_params_lite.yaml" command="load" ns="local_costmap" />
+    <rosparam file="$(find nav)/config/local_costmap_params.yaml" command="load" />
+    <rosparam file="$(find nav)/config/global_costmap_params.yaml" command="load" />
+    <param name="base_global_planner" value="global_planner/GlobalPlanner" />
+    <param name="base_local_planner" value="teb_local_planner/TebLocalPlannerROS" />
+    <rosparam file="$(find nav)/config/teb_local_planner_params_lite.yaml" command="load" />
+  </node>
+
+  <!-- 5. Rviz -->
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find patrol_system)/config/rviz_config.rviz" />
+</launch>
