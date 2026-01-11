@@ -2,67 +2,77 @@
 # -*- coding: utf-8 -*-
 import rospy
 import os
-from sensor_msgs.msg import Image          # 导入图像消息类型
-from std_msgs.msg import Int32MultiArray   # 导入数组消息类型
+from sensor_msgs.msg import Image
+from std_msgs.msg import Int32MultiArray
 from geometry_msgs.msg import Twist
-# 导入分拆出去的模块
 from core.vision_processor import VisionProcessor
-# from core.navigation import NavigationManager (以后加)
 
 class PatrolSystem:
     def __init__(self):
         rospy.init_node('patrol_main_node')
         
-        # 1. 初始化各子模块
+        # 1. 注册关闭时的回调函数（安全机制）
+        rospy.on_shutdown(self.shutdown_hook)
+        
+        # 2. 初始化模块
         self.vision = VisionProcessor()
-        self.evidence_saved = False # 标记是否已经存证
-        # self.nav = NavigationManager() 
+        self.evidence_saved = False 
         
-        # 2. 订阅话题（连接传感器）
-        rospy.Subscriber("/box", Int32MultiArray, self.vision.box_callback)
-        rospy.Subscriber("/repaired_image", Image, self.vision.image_callback)
+        # 3. 订阅话题
+        # 订阅 YOLO 发出的 /yolo_box
+        rospy.Subscriber("/yolo_box", Int32MultiArray, self.vision.box_callback)
+        # 订阅 清晰图像
+        rospy.Subscriber("/debug_image", Image, self.vision.image_callback)
         
-        # 3. 发布话题（连接执行器）
+        # 4. 发布指令
         self.cmd_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
         
-        # 4. 系统状态
-        self.state = "PATROL" # 状态: PATROL(巡逻), ALARM(报警), IDLE(待机)
+        self.state = "PATROL" 
+        rospy.loginfo("巡检系统主程序已启动...")
 
     def run(self):
-        rate = rospy.Rate(10) # 10Hz
+        rate = rospy.Rate(10) 
         while not rospy.is_shutdown():
             self.decision_making()
             rate.sleep()
 
     def decision_making(self):
-        # === 注意：这里所有的代码都必须缩进 4 个空格 ===
-        
         # 场景 A: 发现入侵者
         if self.vision.person_detected:
             if self.state != "ALARM":
-                rospy.logwarn("【状态切换】PATROL -> ALARM")
+                rospy.logwarn("【状态切换】PATROL -> ALARM (发现入侵者)")
                 self.state = "ALARM"
-                self.evidence_saved = False # 重置存证标志
+                self.evidence_saved = False 
             
-            # === 新增逻辑：如果还没存证，就尝试存证 ===
+            # 停车
+            self.stop_robot()
+            
+            # 存证
             if not self.evidence_saved:
-                # 只有当图片不为空时，才算存证成功
                 if self.vision.latest_image is not None:
                     self.vision.save_evidence()
-                    self.evidence_saved = True # 标记已完成，防止重复存
-            # ========================================
-            
-            self.stop_robot()
+                    self.evidence_saved = True 
+                else:
+                    rospy.logwarn_throttle(1, "报警触发但无图，等待下一帧...")
             
         # 场景 B: 环境安全
         else:
             if self.state == "ALARM":
-                rospy.loginfo("【状态切换】ALARM -> PATROL")
+                rospy.loginfo("【状态切换】ALARM -> PATROL (警报解除)")
                 self.state = "PATROL"
+            
+            # 这里以后可以加巡航代码
+            # self.nav.patrol()
 
     def stop_robot(self):
         msg = Twist()
+        msg.linear.x = 0.0
+        msg.angular.z = 0.0
         self.cmd_pub.publish(msg)
+
+    def shutdown_hook(self):
+        rospy.logwarn("正在关闭系统... 发送紧急停车指令！")
+        self.stop_robot()
 
 if __name__ == '__main__':
     try:
